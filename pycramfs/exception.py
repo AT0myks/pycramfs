@@ -1,0 +1,2 @@
+class CramfsError(Exception):
+    pass
