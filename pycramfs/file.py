@@ -196,7 +196,7 @@ class Directory(File):
         if (file := self._files.get(child, None)) is not None:
             if file.is_dir and descendants:
                 return file.select(PurePosixPath(*descendants))
-            else:
+            elif not descendants:
                 return file
         return None
 
