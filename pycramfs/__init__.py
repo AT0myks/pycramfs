@@ -30,8 +30,7 @@ class Cramfs:
         return self._super.fsid.files
 
     def __iter__(self):
-        for file in self._rootdir.riter():
-            yield file
+        yield from self._rootdir.riter()
 
     def __contains__(self, item):
         if isinstance(item, (str, PurePosixPath)):
@@ -66,7 +65,7 @@ class Cramfs:
         return self._rootdir.select(path)
 
     def itermatch(self, pattern):
-        return self._rootdir.itermatch(pattern)
+        yield from self._rootdir.itermatch(pattern)
 
     def calculate_crc(self, size=1024**2):
         self._fd.seek(0)

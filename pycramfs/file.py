@@ -125,7 +125,7 @@ class Directory(File):
         return len(self._files)
 
     def __iter__(self):
-        return self.iterdir()
+        yield from self.iterdir()
 
     def __getitem__(self, key):
         return self._files[key]
@@ -157,16 +157,14 @@ class Directory(File):
         return self._total
 
     def iterdir(self):
-        for file in self._files.values():
-            yield file
+        yield from self._files.values()
 
     def riter(self):
         """Iterate over this directory recursively."""
         yield self
         for file in self._files.values():
             if file.is_dir:
-                for f in file.riter():
-                    yield f
+                yield from file.riter()
             else:
                 yield file
 
