@@ -56,7 +56,7 @@ class BoundedSubStream:
         return self._fd.tell() - self._start
 
 
-def find_superblocks(file_or_bytes, size=4096):
+def find_superblocks(file_or_bytes, size=1024**2):
     """Return a list of dictionaries representing the
     superblocks found in the file with their offset.
     """

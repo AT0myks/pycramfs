@@ -68,7 +68,7 @@ class Cramfs:
     def itermatch(self, pattern):
         return self._rootdir.itermatch(pattern)
 
-    def calculate_crc(self, size=4096):
+    def calculate_crc(self, size=1024**2):
         self._fd.seek(0)
         crc = crc32(self._fd.read(CRC_OFFSET))  # Read until CRC
         self._fd.read(CRC_SIZE)  # Read the CRC but ignore it
