@@ -50,12 +50,12 @@ class Inode(_Base):
 
     @property
     def namelen(self) -> int:
-        "Return the length of the file's name, already multiplied by 4."
+        """Return the length of the file's name, already multiplied by 4."""
         return self._namelen * 4
 
     @property
     def offset(self) -> int:
-        "Return the offset of the file's data, already multiplied by 4."
+        """Return the offset of the file's data, already multiplied by 4."""
         return self._offset * 4
 
     @property
