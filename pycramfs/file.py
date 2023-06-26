@@ -2,6 +2,7 @@ import fnmatch
 import struct
 import zlib
 from pathlib import PurePosixPath
+from typing import Iterator
 
 from pycramfs.const import BLK_FLAGS, BLK_PTR_FMT, PAGE_SIZE, BlockFlag
 from pycramfs.exception import CramfsError
@@ -235,12 +236,11 @@ class Directory(File):
 
 class DataFile(File):
 
-    def read_bytes(self) -> bytes:
+    def iter_bytes(self) -> Iterator[bytes]:
         """Read blocks and decompress them if necessary."""
         maxblock = (self._inode.size + PAGE_SIZE - 1) // PAGE_SIZE
         self._fd.seek(self._inode.offset)
         block_pointers = self._fd.read(struct.calcsize(BLK_PTR_FMT) * maxblock)
-        content = b''
         for block_ptr, *_ in struct.iter_unpack(BLK_PTR_FMT, block_pointers):
             uncompressed = block_ptr & BlockFlag.UNCOMPRESSED
             direct = block_ptr & BlockFlag.DIRECT_PTR
@@ -251,8 +251,10 @@ class DataFile(File):
             data = self._fd.read(block_len)
             if not uncompressed:
                 data = zlib.decompress(data)
-            content += data
-        return content
+            yield data
+
+    def read_bytes(self) -> bytes:
+        return b''.join(self.iter_bytes())
 
     def read_text(self, encoding="utf8", errors="strict") -> str:
         return self.read_bytes().decode(encoding, errors)

@@ -1,9 +1,10 @@
 import stat
 from os import chmod, utime
 from pathlib import Path
+from typing import Optional
 
 from pycramfs.const import Width
-from pycramfs.file import Directory
+from pycramfs.file import DataFile, Directory
 from pycramfs.structure import Inode
 from pycramfs.util import _print
 
@@ -11,13 +12,17 @@ try:
     from os import lchown
 except ImportError:
     def lchown(path, uid, gid):
-        raise PermissionError
+        pass
 
 
-def write_file(path: Path, content: bytes = b'', force: bool = False) -> int:
+def write_file(path: Path, file: Optional[DataFile] = None, force: bool = False) -> int:
     if force or not path.exists():
+        written = 0
         with path.open("wb") as f:
-            return f.write(content)
+            if file is not None:
+                for block in file.iter_bytes():
+                    written += f.write(block)
+        return written
     else:
         raise FileExistsError(f"{path.resolve()} already exists")
 
@@ -50,7 +55,7 @@ def extract_file(file, dest: Path, force: bool = False, quiet: bool = True) -> b
     Return whether the file was created.
     """
     if file.is_file:
-        write_file(dest, file.read_bytes(), force)
+        write_file(dest, file, force)
         chmod(dest, file.mode)
     elif file.is_symlink:
         try:
@@ -63,7 +68,7 @@ def extract_file(file, dest: Path, force: bool = False, quiet: bool = True) -> b
         except OSError:
             # Windows: fallback to writing link destination in file.
             # Either the user is unprivileged or Developer Mode is not enabled.
-            write_file(dest, file.read_bytes(), force)
+            write_file(dest, file, force)
     else:
         if file.is_char_device or file.is_block_device:
             devtype = file.size
