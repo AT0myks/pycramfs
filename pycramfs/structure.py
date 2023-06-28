@@ -20,8 +20,8 @@ class _Base(LittleEndianStructure):
             yield name, dict(attr) if isinstance(attr, _Base) else attr
 
     @classmethod
-    def from_bytes(cls, bytes_: ReadableBuffer):
-        return cls.from_buffer_copy(bytes_)
+    def from_bytes(cls, bytes_: ReadableBuffer, offset: int = 0):
+        return cls.from_buffer_copy(bytes_, offset)
 
     @classmethod
     def from_fd(cls, fd: ByteStream):
