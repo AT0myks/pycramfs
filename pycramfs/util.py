@@ -112,6 +112,6 @@ def test_super(superblock: Super) -> None:
         print("WARNING: old cramfs format")
 
 
-def _print(*args: object, quiet: bool = False, **kwargs: Any) -> None:
+def printq(*args: object, quiet: bool = False, **kwargs: Any) -> None:
     if not quiet:
         print(*args, **kwargs)

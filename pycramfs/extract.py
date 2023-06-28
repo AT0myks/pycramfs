@@ -18,7 +18,7 @@ from pycramfs.file import (
     Symlink
 )
 from pycramfs.structure import Inode
-from pycramfs.util import _print
+from pycramfs.util import printq
 
 if TYPE_CHECKING:
     from pycramfs.types import StrOrBytesPath
@@ -90,7 +90,7 @@ def extract_file(file: File, dest: Path, force: bool = False, quiet: bool = True
         elif isinstance(file, (FIFO, Socket)):
             devtype = 0
         else:
-            _print(f"bogus mode: {file.path} ({file.mode:o})", quiet=quiet)
+            printq(f"bogus mode: {file.path} ({file.mode:o})", quiet=quiet)
             return False
         mknod(dest, file.mode, devtype)  # force is not taken into account here
     change_file_status(dest, file.inode)
@@ -111,6 +111,6 @@ def extract_dir(directory: Directory, dest: Path, force: bool = False, quiet: bo
         else:
             created += extract_file(file, path, force, quiet)
         count += 1
-        _print(f"{count}/{total} {file.name:{width}}", end='\r', quiet=quiet)
-    _print(quiet=quiet)
+        printq(f"{count}/{total} {file.name:{width}}", end='\r', quiet=quiet)
+    printq(quiet=quiet)
     return created

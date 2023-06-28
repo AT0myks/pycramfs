@@ -6,7 +6,7 @@ from pycramfs.const import PAGE_SIZE
 from pycramfs.exception import CramfsError
 from pycramfs.extract import extract_dir, extract_file
 from pycramfs.file import Directory, File, Symlink, filetype
-from pycramfs.util import _print, find_superblocks
+from pycramfs.util import find_superblocks, printq
 
 
 def print_file(file: File) -> None:
@@ -77,7 +77,7 @@ def extract(args: Namespace) -> None:
             if dest is None:
                 dest = args.file.parent / file.name
             amount = extract_file(file, dest, args.force, args.quiet)
-    _print(f"{int(amount)} file(s) extracted to {dest.resolve()}", quiet=args.quiet)
+    printq(f"{int(amount)} file(s) extracted to {dest.resolve()}", quiet=args.quiet)
 
 
 def check(args: Namespace) -> None:
