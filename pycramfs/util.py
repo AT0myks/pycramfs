@@ -1,19 +1,25 @@
+from __future__ import annotations
+
 import io
 from functools import partial
 from pathlib import Path
+from typing import TYPE_CHECKING, IO, Any, AnyStr, List, Optional, Set, Union
 
 from pycramfs.const import MAGIC, MAGIC_BYTES, SIGNATURE, SIGNATURE_BYTES, SUPPORTED_FLAGS, Flag
 from pycramfs.exception import CramfsError
 from pycramfs.file import PAGE_SIZE
 from pycramfs.structure import Super
 
+if TYPE_CHECKING:
+    from pycramfs.types import FileDescriptorOrPath, ReadableBuffer, StructAsDict
 
-class BoundedSubStream:
+
+class BoundedSubStream(IO[AnyStr]):
     """Wrapper around a stream with boundaries that won't allow
     to move before the start or past the end of a sub stream.
     """
 
-    def __init__(self, fd, start=0, end=None) -> None:
+    def __init__(self, fd: IO[AnyStr], start: int = 0, end: Optional[int] = None) -> None:
         """`start` and `end` are the absolute limits of the sub stream.
 
         `end` will usually be `start` + data size.
@@ -22,7 +28,7 @@ class BoundedSubStream:
         self._start = start
         self._end = end if end is not None else self._find_size()
 
-    def __getattr__(self, name: str):
+    def __getattr__(self, name: str) -> Any:
         # Treat anything else as if called directly on the wrapped stream.
         return getattr(self._fd, name)
 
@@ -32,13 +38,13 @@ class BoundedSubStream:
         self._fd.seek(pos)
         return size
 
-    def read(self, size=-1, /) -> bytes:
+    def read(self, size: Optional[int] = -1, /) -> AnyStr:
         max_read = self._end - self._fd.tell()
         if size is None or size < 0 or size > max_read:
             size = max_read
         return self._fd.read(size)
 
-    def seek(self, offset, whence=io.SEEK_SET, /) -> int:
+    def seek(self, offset: int, whence: int = io.SEEK_SET, /) -> int:
         if whence == io.SEEK_SET:
             offset = max(self._start, offset + self._start)
         elif whence == io.SEEK_CUR:
@@ -56,13 +62,16 @@ class BoundedSubStream:
         return self._fd.tell() - self._start
 
 
-def find_superblocks(file_or_bytes, size=1024**2):
+def find_superblocks(
+    file_or_bytes: Union[FileDescriptorOrPath, ReadableBuffer],
+    size: int = 1024**2
+) -> List[StructAsDict]:
     """Return a list of dictionaries representing the
     superblocks found in the file with their offset.
     """
     count = 0
-    indexes = set()
-    result = []
+    indexes: Set[int] = set()
+    result: List[StructAsDict] = []
     if isinstance(file_or_bytes, (str, Path)):
         stream = open(file_or_bytes, "rb")
     elif isinstance(file_or_bytes, (bytes, bytearray)):
@@ -84,12 +93,12 @@ def find_superblocks(file_or_bytes, size=1024**2):
             super = Super.from_fd(f)
             # It's possible that the magic shows up but is just random bytes.
             # That's why we dont decode() the signature and compare the raw bytes.
-            if super.magic == MAGIC and super._signature == SIGNATURE_BYTES:
+            if super.magic == MAGIC and super._signature == SIGNATURE_BYTES:  # type: ignore
                 result.append(dict(super, offset=index))
     return result
 
 
-def test_super(superblock: Super):
+def test_super(superblock: Super) -> None:
     if superblock.magic != MAGIC:
         raise CramfsError("wrong magic")
     if superblock.signature != SIGNATURE:
@@ -105,6 +114,6 @@ def test_super(superblock: Super):
         print("WARNING: old cramfs format")
 
 
-def _print(*args, **kwargs):
-    if not kwargs.pop("quiet", False):
+def _print(*args: object, quiet: bool = False, **kwargs: Any) -> None:
+    if not quiet:
         print(*args, **kwargs)

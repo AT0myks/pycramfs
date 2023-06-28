@@ -1,23 +1,23 @@
-import argparse
+from argparse import ArgumentParser, Namespace
 from pathlib import Path, PurePosixPath
 
 from pycramfs import Cramfs, __version__
 from pycramfs.const import PAGE_SIZE
 from pycramfs.exception import CramfsError
 from pycramfs.extract import extract_dir, extract_file
-from pycramfs.file import filetype
+from pycramfs.file import Directory, File, Symlink, filetype
 from pycramfs.util import _print, find_superblocks
 
 
-def print_file(file):
+def print_file(file: File) -> None:
     # Max file size is 2**24-1 or 16777215 -> 8 characters.
     # Max UID is 2**16-1 or 65535 -> 5 characters.
     # Max GID is 2**8-1 or 255 -> 3 characters.
-    link = f"-> {file.readlink()}" if file.is_symlink else ''
+    link = f"-> {file.readlink()}" if isinstance(file, Symlink) else ''
     print(file.filemode, f"{file.size:8} {file.uid:5}:{file.gid:<3}", file.path, link)
 
 
-def list_(args):
+def list_(args: Namespace) -> None:
     if (types := args.type) is not None:
         types = set(''.join(types).replace('f', '-'))
     count = 0
@@ -38,15 +38,15 @@ def list_(args):
     print(f"{count} file(s) found")
 
 
-def info(args):
+def info(args: Namespace) -> None:
     width = 10
     superblocks = find_superblocks(args.file)
     if not superblocks:
         print("No superblock found")
         return
     for idx, superblock in enumerate(superblocks):
-        super = argparse.Namespace(**superblock)
-        fsid = argparse.Namespace(**super.fsid)
+        super = Namespace(**superblock)
+        fsid = Namespace(**super.fsid)
         print(f"Superblock #{idx + 1}")
         print(f"{'Magic:':{width}} 0x{super.magic:X}")
         print(f"{'Size:':{width}} {super.size:,}")
@@ -63,13 +63,13 @@ def info(args):
             print()
 
 
-def extract(args):
+def extract(args: Namespace) -> None:
     dest = args.dest
     with Cramfs.from_file(args.file, args.offset) as cramfs:
         file = cramfs.select(args.path)
         if file is None:
             raise CramfsError(f"{args.path} not found")
-        elif file.is_dir:
+        elif isinstance(file, Directory):
             if dest is None:
                 dest = args.file.with_name(args.file.stem)
             amount = extract_dir(file, dest, args.force, args.quiet)
@@ -80,7 +80,7 @@ def extract(args):
     _print(f"{int(amount)} file(s) extracted to {dest.resolve()}", quiet=args.quiet)
 
 
-def check(args):
+def check(args: Namespace) -> None:
     with Cramfs.from_file(args.file, args.offset) as cramfs:
         for file in cramfs:
             if file.inode.namelen == 0 and str(file.path) != '/':
@@ -115,13 +115,13 @@ def check(args):
 def main():
     filetypes = list(''.join(filetype).replace('-', 'f'))
 
-    pfile = argparse.ArgumentParser(add_help=False)
+    pfile = ArgumentParser(add_help=False)
     pfile.add_argument("file", type=Path)
 
-    poffset = argparse.ArgumentParser(add_help=False)
+    poffset = ArgumentParser(add_help=False)
     poffset.add_argument("-o", "--offset", type=int, default=0, help="absolute position of file system's start. Default: %(default)s")
 
-    parser = argparse.ArgumentParser()
+    parser = ArgumentParser()
     parser.add_argument("-V", "--version", action="version", version=f"%(prog)s {__version__}")
     subparsers = parser.add_subparsers(required=True, dest="command")  # dest is only here to avoid a TypeError in Python 3.8 (see bpo-29298)
 

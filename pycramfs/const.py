@@ -1,7 +1,8 @@
 from enum import IntEnum, IntFlag
+from typing import Final
 
-MAGIC = 0x28CD3D45
-SIGNATURE = "Compressed ROMFS"
+MAGIC: Final = 0x28CD3D45
+SIGNATURE: Final = "Compressed ROMFS"
 
 
 class Width(IntEnum):
@@ -13,9 +14,9 @@ class Width(IntEnum):
     OFFSET = 26
 
 
-MAXPATHLEN = ((1 << Width.NAMELEN) - 1) << 2
+MAXPATHLEN: Final = ((1 << Width.NAMELEN) - 1) << 2
 
-PAGE_SIZE = 4096
+PAGE_SIZE: Final = 4096
 
 
 class Flag(IntFlag):
@@ -41,12 +42,12 @@ class BlockFlag(IntFlag):
     DIRECT_PTR = 1 << 30
 
 
-BLK_FLAGS = BlockFlag.UNCOMPRESSED | BlockFlag.DIRECT_PTR
+BLK_FLAGS: Final = BlockFlag.UNCOMPRESSED | BlockFlag.DIRECT_PTR
 
-CRC_OFFSET = 32  # Bytes
-CRC_SIZE = 4  # Bytes
+CRC_OFFSET: Final = 32  # Bytes
+CRC_SIZE: Final = 4  # Bytes
 
-BLK_PTR_FMT = "<I"
+BLK_PTR_FMT: Final = "<I"
 
-MAGIC_BYTES = MAGIC.to_bytes(4, "little")
-SIGNATURE_BYTES = b"Compressed ROMFS"
+MAGIC_BYTES: Final = MAGIC.to_bytes(4, "little")
+SIGNATURE_BYTES: Final = b"Compressed ROMFS"

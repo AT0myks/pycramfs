@@ -1,17 +1,32 @@
+from __future__ import annotations
+
 import stat
 from os import chmod, utime
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from pycramfs.const import Width
-from pycramfs.file import DataFile, Directory
+from pycramfs.file import (
+    FIFO,
+    BlockDevice,
+    CharacterDevice,
+    DataFile,
+    Directory,
+    File,
+    RegularFile,
+    Socket,
+    Symlink
+)
 from pycramfs.structure import Inode
 from pycramfs.util import _print
 
+if TYPE_CHECKING:
+    from pycramfs.types import StrOrBytesPath
+
 try:
-    from os import lchown
+    from os import lchown  # type: ignore
 except ImportError:
-    def lchown(path, uid, gid):
+    def lchown(path: StrOrBytesPath, uid: int, gid: int) -> None:
         pass
 
 
@@ -28,9 +43,9 @@ def write_file(path: Path, file: Optional[DataFile] = None, force: bool = False)
 
 
 try:
-    from os import mknod
+    from os import mknod  # type: ignore
 except ImportError:
-    def mknod(path, mode=0o600, device=0):
+    def mknod(path: Path, mode: int = 0o600, device: int = 0) -> None:
         write_file(path)
 
 
@@ -49,15 +64,15 @@ def change_file_status(path: Path, inode: Inode) -> None:
     utime(path, (0, 0))
 
 
-def extract_file(file, dest: Path, force: bool = False, quiet: bool = True) -> bool:
+def extract_file(file: File, dest: Path, force: bool = False, quiet: bool = True) -> bool:
     """Extract a file that is not a directory.
 
     Return whether the file was created.
     """
-    if file.is_file:
+    if isinstance(file, RegularFile):
         write_file(dest, file, force)
         chmod(dest, file.mode)
-    elif file.is_symlink:
+    elif isinstance(file, Symlink):
         try:
             dest.symlink_to(file.read_bytes())
         except FileExistsError:
@@ -70,9 +85,9 @@ def extract_file(file, dest: Path, force: bool = False, quiet: bool = True) -> b
             # Either the user is unprivileged or Developer Mode is not enabled.
             write_file(dest, file, force)
     else:
-        if file.is_char_device or file.is_block_device:
+        if isinstance(file, (CharacterDevice, BlockDevice)):
             devtype = file.size
-        elif file.is_fifo or file.is_socket:
+        elif isinstance(file, (FIFO, Socket)):
             devtype = 0
         else:
             _print(f"bogus mode: {file.path} ({file.mode:o})", quiet=quiet)
@@ -82,7 +97,7 @@ def extract_file(file, dest: Path, force: bool = False, quiet: bool = True) -> b
     return True
 
 
-def extract_dir(directory: Directory, dest: Path, force: bool = False, quiet: bool = True):
+def extract_dir(directory: Directory, dest: Path, force: bool = False, quiet: bool = True) -> int:
     """Extract a directory tree. Return the amount of files created."""
     total = directory.total
     width = 2**Width.NAMELEN

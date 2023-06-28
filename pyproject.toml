@@ -27,7 +27,8 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Filesystems",
-    "Topic :: Utilities"
+    "Topic :: Utilities",
+    "Typing :: Typed"
 ]
 dynamic = ["version"]
 
@@ -40,6 +41,7 @@ pycramfs = "pycramfs.__main__:main"
 
 [tool.setuptools]
 packages = ["pycramfs"]
+package-data = {pycramfs = ["py.typed"]}
 
 [tool.setuptools.dynamic]
 version = {attr = "pycramfs.__version__"}

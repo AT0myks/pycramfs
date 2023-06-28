@@ -1,42 +1,55 @@
+from __future__ import annotations
+
 import fnmatch
 import struct
 import zlib
 from pathlib import PurePosixPath
-from typing import Iterator
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Literal, Optional, Tuple
 
 from pycramfs.const import BLK_FLAGS, BLK_PTR_FMT, PAGE_SIZE, BlockFlag
 from pycramfs.exception import CramfsError
 from pycramfs.structure import Inode
 
+if TYPE_CHECKING:
+    from pycramfs import Cramfs
+    from pycramfs.types import ByteStream, StrPath
+
 
 class File:
     """Abstract base class for files."""
 
-    def __init__(self, fd, image, inode: Inode, name: bytes, parent=None):
+    def __init__(
+        self,
+        fd: ByteStream,
+        image: Cramfs,
+        inode: Inode,
+        name: bytes,
+        parent: Optional[Directory] = None
+    ) -> None:
         self._fd = fd
         self._image = image
         self._inode = inode
         self._name = name
         self._parent = parent
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__qualname__}({self.name!r})"
 
-    def __lt__(self, other):
+    def __lt__(self, other: Any) -> bool:
         if not isinstance(other, File):
             return NotImplemented
         return self._name < other._name
 
-    def __le__(self, other):
+    def __le__(self, other: Any) -> bool:
         if not isinstance(other, File):
             return NotImplemented
         return self._name <= other._name
 
     @property
-    def image(self):
+    def image(self) -> Cramfs:
         return self._image
 
     @property
@@ -48,7 +61,7 @@ class File:
         return self._name.decode()
 
     @property
-    def parent(self):
+    def parent(self) -> Optional[Directory]:
         return self._parent
 
     @property
@@ -87,89 +100,97 @@ class File:
         return self._inode.filemode
 
     @property
-    def is_dir(self):
+    def is_dir(self) -> bool:
         return False
 
     @property
-    def is_file(self):
+    def is_file(self) -> bool:
         return False
 
     @property
-    def is_symlink(self):
+    def is_symlink(self) -> bool:
         return False
 
     @property
-    def is_block_device(self):
+    def is_block_device(self) -> bool:
         return False
 
     @property
-    def is_char_device(self):
+    def is_char_device(self) -> bool:
         return False
 
     @property
-    def is_fifo(self):
+    def is_fifo(self) -> bool:
         return False
 
     @property
-    def is_socket(self):
+    def is_socket(self) -> bool:
         return False
 
 
 class Directory(File):
 
-    def __init__(self, fd, image, inode: Inode, name: bytes = b'', parent=None, files=None):
+    def __init__(
+        self,
+        fd: ByteStream,
+        image: Cramfs,
+        inode: Inode,
+        name: bytes = b'',
+        parent: Optional[Directory] = None,
+        files: Optional[Dict[str, File]] = None
+    ) -> None:
         super().__init__(fd, image, inode, name, parent)
         self._files = files if files is not None else {}
         self._total = None
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._files)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[File]:
         yield from self.iterdir()
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> File:
         return self._files[key]
 
-    def __contains__(self, item):
+    def __contains__(self, item: Any) -> bool:
         if isinstance(item, str):
             return item in self._files
         elif isinstance(item, File):
             return item in self._files.values()
         return False
 
-    def __reversed__(self):
+    def __reversed__(self) -> Iterator[File]:
         for filename in reversed(self._files):
             yield self._files[filename]
 
     @property
-    def is_dir(self):
+    def is_dir(self) -> Literal[True]:
         return True
 
     @property
-    def files(self):
+    def files(self) -> Dict[str, File]:
         return self._files
 
     @property
-    def total(self):
+    def total(self) -> int:
         """Return the total amount of files in this subtree."""
         if self._total is None:
-            self._total = len(self) + sum(child.total for child in self._files.values() if child.is_dir)
+            self._total = len(self) + sum(child.total for child in self._files.values() if isinstance(child, Directory))
         return self._total
 
-    def iterdir(self):
+    def iterdir(self) -> Iterator[File]:
         yield from self._files.values()
 
-    def riter(self):
+    def riter(self) -> Iterator[File]:
         """Iterate over this directory recursively."""
         yield self
         for file in self._files.values():
-            if file.is_dir:
+            if isinstance(file, Directory):
                 yield from file.riter()
             else:
                 yield file
 
-    def find(self, filename):
+    def find(self, filename: StrPath) -> Optional[File]:
         """Find a file of any kind anywhere under this directory."""
         filename = PurePosixPath(filename).name
         for file in self.riter():
@@ -177,7 +198,7 @@ class Directory(File):
                 return file
         return None
 
-    def select(self, path):
+    def select(self, path: StrPath) -> Optional[File]:
         """Select a file of any kind by path.
 
         The path can be absolute or relative.
@@ -195,13 +216,13 @@ class Directory(File):
             return self
         child, *descendants = path.parts
         if (file := self._files.get(child, None)) is not None:
-            if file.is_dir and descendants:
+            if isinstance(file, Directory) and descendants:
                 return file.select(PurePosixPath(*descendants))
             elif not descendants:
                 return file
         return None
 
-    def itermatch(self, pattern):
+    def itermatch(self, pattern: str) -> Iterator[File]:
         """Iterate over files in this subtree that (fn)match the pattern."""
         # We must use str() here because filter doesn't call normcase on Posix.
         if str(self.path) == '/':
@@ -209,16 +230,16 @@ class Directory(File):
         else:
             paths = (str(file.path.relative_to(self.path)) for file in self.riter())
         for path in fnmatch.filter(paths, pattern):
-            yield self.select(path)
+            yield self.select(path)  # type: ignore
 
     @classmethod
-    def from_fd(cls, fd, image, inode: Inode, name: bytes = b''):
+    def from_fd(cls, fd: ByteStream, image: Cramfs, inode: Inode, name: bytes = b'') -> Directory:
         self = cls(fd, image, inode, name)
         if inode.offset == 0:  # Empty dir
             return self
         fd.seek(inode.offset)
         end = inode.size + inode.offset
-        children = []
+        children: List[Tuple[Inode, bytes]] = []
         while fd.tell() != end:
             ino = Inode.from_fd(fd)
             name = fd.read(ino.namelen).rstrip(b'\x00')
@@ -256,52 +277,52 @@ class DataFile(File):
     def read_bytes(self) -> bytes:
         return b''.join(self.iter_bytes())
 
-    def read_text(self, encoding="utf8", errors="strict") -> str:
+    def read_text(self, encoding: str = "utf8", errors: str = "strict") -> str:
         return self.read_bytes().decode(encoding, errors)
 
 
 class RegularFile(DataFile):
 
     @property
-    def is_file(self):
+    def is_file(self) -> Literal[True]:
         return True
 
 
 class Symlink(DataFile):
 
     @property
-    def is_symlink(self):
+    def is_symlink(self) -> Literal[True]:
         return True
 
-    def readlink(self):
+    def readlink(self) -> PurePosixPath:
         return PurePosixPath(self.read_text())
 
 
 class FIFO(File):
 
     @property
-    def is_fifo(self):
+    def is_fifo(self) -> Literal[True]:
         return True
 
 
 class Socket(File):
 
     @property
-    def is_socket(self):
+    def is_socket(self) -> Literal[True]:
         return True
 
 
 class CharacterDevice(File):
 
     @property
-    def is_char_device(self):
+    def is_char_device(self) -> Literal[True]:
         return True
 
 
 class BlockDevice(File):
 
     @property
-    def is_block_device(self):
+    def is_block_device(self) -> Literal[True]:
         return True
 
 

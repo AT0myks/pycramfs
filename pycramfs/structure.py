@@ -1,12 +1,18 @@
+from __future__ import annotations
+
 import stat
 from ctypes import LittleEndianStructure, c_char, c_uint32, sizeof
+from typing import TYPE_CHECKING, Iterator, Tuple
 
 from pycramfs.const import Flag, Width
+
+if TYPE_CHECKING:
+    from pycramfs.types import ByteStream, ReadableBuffer, StructAsDict
 
 
 class _Base(LittleEndianStructure):
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Tuple[str, StructAsDict]]:
         # This allows calling dict() on instances of this class.
         for name, *_ in self._fields_:
             name = name.lstrip('_')
@@ -14,11 +20,11 @@ class _Base(LittleEndianStructure):
             yield name, dict(attr) if isinstance(attr, _Base) else attr
 
     @classmethod
-    def from_bytes(cls, bytes_):
+    def from_bytes(cls, bytes_: ReadableBuffer):
         return cls.from_buffer_copy(bytes_)
 
     @classmethod
-    def from_fd(cls, fd):
+    def from_fd(cls, fd: ByteStream):
         return cls.from_bytes(fd.read(sizeof(cls)))
 
 
@@ -31,6 +37,12 @@ class Inode(_Base):
         ("_namelen", c_uint32, Width.NAMELEN),
         ("_offset", c_uint32, Width.OFFSET),
     ]
+    _mode: int
+    _uid: int
+    _size: int
+    _gid: int
+    _namelen: int
+    _offset: int
 
     @property
     def mode(self) -> int:
@@ -98,6 +110,10 @@ class Info(_Base):
         ("_blocks", c_uint32),
         ("_files", c_uint32),
     ]
+    _crc: int
+    _edition: int
+    _blocks: int
+    _files: int
 
     @property
     def crc(self) -> int:
@@ -127,6 +143,14 @@ class Super(_Base):
         ("_name", c_char * 16),
         ("_root", Inode),
     ]
+    _magic: int
+    _size: int
+    _flags: int
+    _future: int
+    _signature: bytes
+    _fsid: Info
+    _name: bytes
+    _root: Inode
 
     @property
     def magic(self) -> int:

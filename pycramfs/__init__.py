@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import io
 from functools import partial
 from pathlib import PurePosixPath
+from typing import TYPE_CHECKING, Any, BinaryIO, Iterator, Optional
 from zlib import crc32
 
 from pycramfs.const import CRC_OFFSET, CRC_SIZE
@@ -8,12 +11,21 @@ from pycramfs.file import Directory, File
 from pycramfs.structure import Super
 from pycramfs.util import BoundedSubStream, test_super
 
+if TYPE_CHECKING:
+    from pycramfs.types import ByteStream, FileDescriptorOrPath, ReadableBuffer, StrPath
+
 __version__ = "1.0.0"
 
 
 class Cramfs:
 
-    def __init__(self, fd: BoundedSubStream, super: Super, rootdir: Directory = None, closefd: bool = True):
+    def __init__(
+        self,
+        fd: ByteStream,
+        super: Super,
+        rootdir: Directory,
+        closefd: bool = True
+    ) -> None:
         self._fd = fd
         self._super = super
         self._rootdir = rootdir
@@ -22,17 +34,17 @@ class Cramfs:
     def __enter__(self):
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, *_: Any) -> None:
         if self._closefd:
             self.close()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self._super.fsid.files
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[File]:
         yield from self._rootdir.riter()
 
-    def __contains__(self, item):
+    def __contains__(self, item: Any):
         if isinstance(item, (str, PurePosixPath)):
             return self.select(item) is not None
         elif isinstance(item, File):
@@ -58,16 +70,16 @@ class Cramfs:
     def close(self) -> None:
         self._fd.close()
 
-    def find(self, filename):
+    def find(self, filename: StrPath) -> Optional[File]:
         return self._rootdir.find(filename)
 
-    def select(self, path):
+    def select(self, path: StrPath) -> Optional[File]:
         return self._rootdir.select(path)
 
-    def itermatch(self, pattern):
+    def itermatch(self, pattern: str) -> Iterator[File]:
         yield from self._rootdir.itermatch(pattern)
 
-    def calculate_crc(self, size=1024**2):
+    def calculate_crc(self, size: int = 1024**2) -> int:
         self._fd.seek(0)
         crc = crc32(self._fd.read(CRC_OFFSET))  # Read until CRC
         self._fd.read(CRC_SIZE)  # Read the CRC but ignore it
@@ -77,7 +89,7 @@ class Cramfs:
         return crc
 
     @classmethod
-    def from_fd(cls, fd, offset=0, closefd=True):
+    def from_fd(cls, fd: BinaryIO, offset: int = 0, closefd: bool = True):
         """Create a Cramfs object from a file descriptor.
 
         `offset` must be the absolute position at which the superblock starts.
@@ -85,15 +97,15 @@ class Cramfs:
         fd.seek(offset)
         super = Super.from_fd(fd)
         test_super(super)
-        fd = BoundedSubStream(fd, offset, offset + super.size)
-        self = cls(fd, super, closefd=closefd)
-        self._rootdir = Directory.from_fd(fd, self, self._super.root)
+        fd_ = BoundedSubStream(fd, offset, offset + super.size)
+        self = cls(fd_, super, None, closefd)  # type: ignore
+        self._rootdir = Directory.from_fd(fd_, self, self._super.root)
         return self
 
     @classmethod
-    def from_bytes(cls, bytes_, offset=0):
+    def from_bytes(cls, bytes_: ReadableBuffer, offset: int = 0):
         return cls.from_fd(io.BytesIO(bytes_), offset)
 
     @classmethod
-    def from_file(cls, path, offset=0):
-        return cls.from_fd(open(path, "rb"), offset)
+    def from_file(cls, file: FileDescriptorOrPath, offset: int = 0):
+        return cls.from_fd(open(file, "rb"), offset)
