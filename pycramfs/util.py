@@ -69,7 +69,6 @@ def find_superblocks(
     """Return a list of dictionaries representing the
     superblocks found in the file with their offset.
     """
-    count = 0
     indexes: Set[int] = set()
     result: List[StructAsDict] = []
     if isinstance(file_or_bytes, (str, Path)):
@@ -80,14 +79,13 @@ def find_superblocks(
         raise TypeError("argument must be a path or bytes")
     with stream as f:
         prev_block = b''
-        for next_block in iter(partial(f.read, size), b''):
+        for count, next_block in enumerate(iter(partial(f.read, size), b'')):
             # We don't want to "cut" in the middle of a magic.
             block = prev_block + next_block
             index = block.find(MAGIC_BYTES)
             if index != -1:
                 indexes.add(index + (count * size) - len(prev_block))
-            prev_block = next_block
-            count += 1
+            prev_block = next_block[-(len(MAGIC_BYTES) - 1) :]
         for index in sorted(indexes):
             f.seek(index)
             super = Super.from_fd(f)
