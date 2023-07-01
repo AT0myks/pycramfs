@@ -14,7 +14,7 @@ from pycramfs.util import BoundedSubStream, test_super
 if TYPE_CHECKING:
     from pycramfs.types import ByteStream, FileDescriptorOrPath, ReadableBuffer, StrPath
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 
 class Cramfs:
